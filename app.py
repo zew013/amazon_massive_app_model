@@ -100,7 +100,7 @@ class status(Resource):
             return {'data':'Api running'}
         except(error):
             return {'data':error}
-
+'''
 class PredictIntent(Resource):
     def get(self, order):
         # use parser and find the user's query
@@ -129,12 +129,13 @@ class PredictIntent(Resource):
                 }
 
         return output
+'''
 # http://127.0.0.1:5000/PredictIntent/tell me the time
 
 # Setup the Api resource routing here
 # Route the URL to the resource
 api.add_resource(status, '/')
-api.add_resource(PredictIntent, '/PredictIntent/<string:order>')
+#api.add_resource(PredictIntent, '/PredictIntent/<string:order>')
 
 
 if __name__ == '__main__':

@@ -7,16 +7,25 @@ from flask_cors import CORS
 import json
 from json import JSONEncoder
 import pandas as pd
+from smart_open import open as smart_open
+import io
+
 app = Flask(__name__)
 
 CORS(app)
 api = Api(app)
 
 
-model_path = './saved_model/model.pt'
-model = torch.load(model_path,map_location=torch.device('cpu'))
+#model_path = './saved_model/model.pt'
+load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/model.pt"
+with smart_open(load_path, 'rb') as f:
+    buffer = io.BytesIO(f.read())
+    model=torch.load(buffer,map_location=torch.device('cpu'))
+#model = torch.load(model_path,map_location=torch.device('cpu'))
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side="left")
 
+#model = AutoModel.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
+#tokenizer = AutoTokenizer.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 # argument parsing
 #parser = reqparse.RequestParser()
 #parser.add_argument('query')

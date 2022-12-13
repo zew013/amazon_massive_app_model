@@ -18,9 +18,10 @@ api = Api(app)
 
 #model_path = './saved_model/model.pt'
 load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/model.pt"
+print(load_path)
 with smart_open(load_path, 'rb') as f:
-    buffer = io.BytesIO(f.read())
-    model=torch.load(buffer,map_location=torch.device('cpu'))
+    #buffer = io.BytesIO(f.read())
+    model=torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu'))
 #model = torch.load(model_path,map_location=torch.device('cpu'))
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side="left")
 

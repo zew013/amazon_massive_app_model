@@ -14,7 +14,7 @@ api = Api(app)
 
 
 model_path = './saved_model/model.pt'
-model = torch.load(model_path)
+model = torch.load(model_path,map_location=torch.device('cpu'))
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side="left")
 
 # argument parsing

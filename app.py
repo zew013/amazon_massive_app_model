@@ -84,6 +84,13 @@ INTENTS = [
     "lists_query",
 ]
 
+class status(Resource):
+    def get(self):
+        try:
+            return {'data':'Api running'}
+        except(error):
+            return {'data':error}
+
 class PredictIntent(Resource):
     def get(self, order):
         # use parser and find the user's query
@@ -116,6 +123,7 @@ class PredictIntent(Resource):
 
 # Setup the Api resource routing here
 # Route the URL to the resource
+api.add_resource(status, '/')
 api.add_resource(PredictIntent, '/PredictIntent/<string:order>')
 
 

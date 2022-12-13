@@ -17,6 +17,7 @@ api = Api(app)
 
 
 #model_path = './saved_model/model.pt'
+'''
 load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/model.pt"
 print(load_path)
 with smart_open(load_path, 'rb') as f:
@@ -24,7 +25,7 @@ with smart_open(load_path, 'rb') as f:
     model=torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu'))
 #model = torch.load(model_path,map_location=torch.device('cpu'))
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side="left")
-
+'''
 #model = AutoModel.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 #tokenizer = AutoTokenizer.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 # argument parsing

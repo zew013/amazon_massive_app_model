@@ -148,7 +148,7 @@ class PredictIntent(Resource):
             tokenized[key] = torch.tensor(value)
 
         #s = torch.nn.functional.softmax(model(tokenized, None )).detach().numpy()[0]
-        print(tokenized)
+
         model(tokenized['input_ids'], None )
         s = torch.nn.functional.softmax(model(tokenized['input_ids'], None )).detach().numpy()[0]
 

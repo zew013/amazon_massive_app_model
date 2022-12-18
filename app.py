@@ -4,12 +4,12 @@ import torch
 import numpy as np
 from transformers import BertTokenizer
 from flask_cors import CORS
-import json
-from json import JSONEncoder
+#import json
+#from json import JSONEncoder
 import pandas as pd
 from smart_open import open as smart_open
 import io
-
+import distill
 app = Flask(__name__)
 
 CORS(app)
@@ -17,15 +17,50 @@ api = Api(app)
 
 
 #model_path = './saved_model/model.pt'
-'''
-load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/model.pt"
+
+#load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/model.pt"
+load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/student.pt"
 print(load_path)
-with smart_open(load_path, 'rb') as f:
-    #buffer = io.BytesIO(f.read())
-    model=torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu'))
+
+
+
+
 #model = torch.load(model_path,map_location=torch.device('cpu'))
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side="left")
-'''
+
+config = {
+        'vocab_size' : len(tokenizer.get_vocab()),
+        'embedding_size' : 300,
+        'hidden_size' : 512,
+        'fc_size' : 128,
+        'num_layers' : 2,
+        'n_classes' : 60,
+        'dropout' : 0.5,
+        'epochs' : 40,
+        'lr' : 5e-4,
+        'temp' : 1,
+        'weight_decay' : 1e-4,
+        'alpha' : 0.95,
+        'batch_size' : 256,
+        'input_dir' : 'assets',
+        'dataset' : 'amazon',
+        'ignore_cache' : False,
+        'max_len' : 20,
+        'early_stop' : 3
+        #'output_dir' : 'result',
+        }
+class AttributeDict(dict):
+    __getattr__ = dict.__getitem__
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+    
+config = AttributeDict(config)
+
+with smart_open(load_path, 'rb') as f:
+
+    #model=torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu'))
+    model = distill.StudentModel(config)
+    model.load_state_dict(torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu')))
 #model = AutoModel.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 #tokenizer = AutoTokenizer.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 # argument parsing
@@ -101,7 +136,7 @@ class status(Resource):
             return {'data':'Api running'}
         except(error):
             return {'data':error}
-'''
+
 class PredictIntent(Resource):
     def get(self, order):
         # use parser and find the user's query
@@ -112,9 +147,11 @@ class PredictIntent(Resource):
         for key, value in tokenized.items():
             tokenized[key] = torch.tensor(value)
 
-        s = torch.nn.functional.softmax(model(tokenized, None )).detach().numpy()[0]
+        #s = torch.nn.functional.softmax(model(tokenized, None )).detach().numpy()[0]
+        print(tokenized)
+        model(tokenized['input_ids'], None )
+        s = torch.nn.functional.softmax(model(tokenized['input_ids'], None )).detach().numpy()[0]
 
-        
         index = np.argsort(s)[-5:][::-1]
         prob = s[index]
         intent = np.array(INTENTS)[index]
@@ -130,13 +167,13 @@ class PredictIntent(Resource):
                 }
 
         return output
-'''
+
 # http://127.0.0.1:5000/PredictIntent/tell me the time
 
 # Setup the Api resource routing here
 # Route the URL to the resource
 api.add_resource(status, '/')
-#api.add_resource(PredictIntent, '/PredictIntent/<string:order>')
+api.add_resource(PredictIntent, '/PredictIntent/<string:order>')
 
 
 if __name__ == '__main__':

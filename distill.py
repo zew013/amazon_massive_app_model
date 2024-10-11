@@ -31,6 +31,7 @@ class StudentModel(nn.Module):
         )
     
     def forward(self, input_ids, attention_mask):
+    # def forward(self, input_ids): # this is correct but since model has been trained use the wrong one
         #input_ids.shape = (batch_size, seq_len)
 
         #embedding.shape = (batch_size, seq_len, hidden_size)
@@ -101,9 +102,11 @@ def learn(config, teacher_model, datasets, tokenizer):
                 print('std', next(student_model.parameters()).is_cuda)
                 '''
                 student_prediction = student_model(inputs['input_ids'], inputs['attention_mask'])
+                # student_prediction = student_model(inputs['input_ids']) # this is correct but since model has been trained use the wrong one
 
                 student_hard_loss = hard_loss(student_prediction, labels)
                 student_soft_loss = soft_loss(
+                    # because In PyTorch, the nn.KLDivLoss function expects: The input to be in log-probabilities (log-softmax) The target to be in probabilities (softmax).
                     F.log_softmax(student_prediction/config.temp, dim=-1),
                     F.softmax(teacher_prediciton/config.temp, dim=-1))
                 

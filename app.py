@@ -1,15 +1,18 @@
 from flask import Flask, request
 from flask_restful import Api, Resource
-import torch
+# import torch
 import numpy as np
 from transformers import BertTokenizer
 from flask_cors import CORS
-#import json
+import json
 #from json import JSONEncoder
-import pandas as pd
-from smart_open import open as smart_open
+# import pandas as pd
 import io
 import distill
+import os
+import onnxruntime as ort  # ONNX Runtime
+import time
+
 app = Flask(__name__)
 
 CORS(app)
@@ -21,9 +24,6 @@ api = Api(app)
 #load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/model.pt"
 load_path = "https://amazonmassive.s3.us-west-1.amazonaws.com/student.pt"
 print(load_path)
-
-
-
 
 #model = torch.load(model_path,map_location=torch.device('cpu'))
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side="left")
@@ -56,11 +56,28 @@ class AttributeDict(dict):
     
 config = AttributeDict(config)
 
-with smart_open(load_path, 'rb') as f:
+# if not os.path.exists('local_model.pt'):
+    
+#     with smart_open(load_path, 'rb') as f:
+#         with open('local_model.pt', 'wb') as local_f:
+#             local_f.write(f.read())
+#     print('downloaded model to local')
+# update to use onnx
+if not os.path.exists('student_model.onnx'):
+    from smart_open import open as smart_open
+    with smart_open(load_path, 'rb') as f:
+        with open('student_model.onnx', 'wb') as local_f:
+            local_f.write(f.read())
+    print('Downloaded ONNX model to local')
+ort_session = ort.InferenceSession("student_model.onnx")
+# model = distill.StudentModel(config)
+# model.load_state_dict(torch.load('local_model.pt', map_location=torch.device('cpu')))
 
-    #model=torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu'))
-    model = distill.StudentModel(config)
-    model.load_state_dict(torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu')))
+# with smart_open(load_path, 'rb') as f:
+
+#     #model=torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu'))
+#     model = distill.StudentModel(config)
+#     model.load_state_dict(torch.load(io.BytesIO(f.read()),map_location=torch.device('cpu')))
 #model = AutoModel.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 #tokenizer = AutoTokenizer.from_pretrained("cartesinus/bert-base-uncased-amazon-massive-intent")
 # argument parsing
@@ -140,35 +157,57 @@ class status(Resource):
 class PredictIntent(Resource):
     def get(self, order):
         # use parser and find the user's query
-
+        start_time = time.time()
 
         # vectorize the user's query and make a prediction
-        tokenized = tokenizer([str(order)], padding='max_length', truncation=True, max_length=20)
-        for key, value in tokenized.items():
-            tokenized[key] = torch.tensor(value)
-
+        # tokenized = tokenizer([str(order)], padding='max_length', truncation=True, max_length=20)
+        # for key, value in tokenized.items():
+        #     tokenized[key] = torch.tensor(value)
+        tokenized = tokenizer(
+            [str(order)],
+            padding='max_length',
+            truncation=True,
+            max_length=config.max_len,
+            return_tensors='np'  # Use NumPy tensors for ONNX Runtime
+        )
+        ort_inputs = {
+            'input_ids': tokenized['input_ids'].astype(np.int64),
+            'attention_mask': None
+        }
+        logits = ort_session.run(None, ort_inputs)[0]
+        # Apply softmax to get probabilities
+        s = np.exp(logits) / np.sum(np.exp(logits), axis=1, keepdims=True)
+        s = s[0]  # Since batch size is 1
         #s = torch.nn.functional.softmax(model(tokenized, None )).detach().numpy()[0]
 
-        model(tokenized['input_ids'], None )
-        s = torch.nn.functional.softmax(model(tokenized['input_ids'], None )).detach().numpy()[0]
+        # model(tokenized['input_ids'], None )
+        # s = torch.nn.functional.softmax(model(tokenized['input_ids'], None )).detach().numpy()[0]
 
         index = np.argsort(s)[-5:][::-1]
         prob = s[index]
         intent = np.array(INTENTS)[index]
 
+        result_list = [{"intent": str(intent[i]), "prob": round(float(prob[i]), 3)} for i in range(len(intent))]
+        result_json = json.dumps(result_list)
+        # print(result_json)
         # Serialization if want to display np array
         #numpyData = {"array": numpyArrayOne}
         #encodedNumpyData = json.dumps(numpyData, cls=NumpyArrayEncoder)
         # create JSON object
+        end_time = time.time()
+
         output = {
                 'prediction': str(intent[0]), 
                 'confidence': str(prob[0]), 
-                'df': pd.DataFrame({'intent':intent, 'prob':prob}).to_json(orient = 'records')
+                'df': result_json, # pd.DataFrame({'intent':intent, 'prob':prob}).to_json(orient = 'records')
+                'time_infer': end_time - start_time
                 }
-
+        # print(pd.DataFrame({'intent':intent, 'prob':prob}).to_json(orient = 'records'))
+        # curl -X GET 'http://127.0.0.1:5001/PredictIntent/tell%me%the%time'
+        # curl -X GET 'http://127.0.0.1:5001/PredictIntent/tell%me%the%time%please%please%tell%me%the%time%please%pleastell%me%the%time%please%pleastell%me%the%time%please%pleas'
         return output
 
-# http://127.0.0.1:5000/PredictIntent/tell me the time
+# http://127.0.0.1:5001/PredictIntent/tell me the time
 
 # Setup the Api resource routing here
 # Route the URL to the resource
@@ -177,4 +216,4 @@ api.add_resource(PredictIntent, '/PredictIntent/<string:order>')
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='127.0.0.1', port=5001, debug=True, use_reloader=False)
